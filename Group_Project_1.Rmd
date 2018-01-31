@@ -1,0 +1,107 @@
+---
+title: "Group_Project_1"
+author: "Shine,    ,    "
+date: "1/30/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+
+load the packages
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)   # loads a number of helpful Hadley Wickham packages
+library(ggplot2)     # way better than Base plotting
+library(tidyr)       # newer replacement for package Reshape
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(openxlsx)
+library(lubridate)
+```
+
+1. Read the data of Taxi_case csv file
+
+```{r, message=FALSE, echo=TRUE}
+
+Taxi.df <- read.csv("~/Google Drive/2018 Spring Course/Big Data 2/My R Work/Team Project 1/Taxi_case.csv")
+Taxi.df[,1] =NULL
+
+#Change the date and time format
+Taxi.df$from_date <- convertToDateTime(Taxi.df$from_date, tx = "IST")
+Taxi.df$booking_created<- convertToDateTime(Taxi.df$booking_created, tx = "IST")  
+
+#Extract Month, Weekday and Time from trip starting
+Taxi.df$from_month <- month(Taxi.df$from_date,label = TRUE)
+Taxi.df$from_weekday <- wday(Taxi.df$from_date, label = TRUE)
+Taxi.df$from_time <- strftime(Taxi.df$from_date, format="%H:%M:%S")
+
+#Extract Month, Weekday and Time from booking
+Taxi.df$booking_month <- month(Taxi.df$booking_created,label = TRUE)
+Taxi.df$booking_weekday <- wday(Taxi.df$booking_created, label = TRUE)
+Taxi.df$booking_time <- strftime(Taxi.df$booking_created, format="%H:%M:%S")
+
+#calculate the lead hours between booking time and trip start time
+Taxi.df$lead_hour <- time_length(interval(Taxi.df$booking_created,Taxi.df$from_date),"hour")
+
+head(Taxi.df,20)
+```
+
+2.Convert data type
+```{r}
+
+Taxi.df$vehicle_model_id <- as.factor(Taxi.df$vehicle_model_id)
+
+Taxi.df$package_id <- as.factor(Taxi.df$package_id)
+
+Taxi.df$travel_type_id <- as.factor(Taxi.df$travel_type_id)
+
+Taxi.df$from_city_id <- as.factor(Taxi.df$booking_weekday)
+
+Taxi.df$online_booking <- as.factor(Taxi.df$online_booking)
+
+Taxi.df$mobile_site_booking <- as.factor(Taxi.df$mobile_site_booking)
+
+Taxi.df$from_month <- as.factor(Taxi.df$from_month)
+
+Taxi.df$from_weekday <- as.factor(Taxi.df$from_weekday)
+
+Taxi.df$booking_month <- as.factor(Taxi.df$booking_month)
+
+Taxi.df$booking_weekday <- as.factor(Taxi.df$booking_weekday)
+
+Taxi.df$lead_hour <- round(as.numeric(Taxi.df$lead_hour))
+
+```
+
+3.Build train data and test data
+```{r}
+# Set random seed. Don't remove this line.
+set.seed(1)
+
+# Shuffle the dataset; build train and test at 7:3
+n <- nrow(Taxi.df)
+shuffled <- Taxi.df[sample(n),]
+Taxi_train <- shuffled[1:round(0.7 * n),]
+
+Taxi_test <- shuffled[(round(0.7 * n) + 1):n,]
+
+
+fml <- Car_Cancellation ~.-(booking_time+to_date)
+
+Cancellation_tree <- rpart(fml,data = Taxi_train, method = "class")
+
+Cancellation_pred <- predict(Cancellation_tree, Taxi_test, type = "class")
+
+
+confusionMatrix(data = Cancellation_pred,reference = Taxi_test$Car_Cancellation) 
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
